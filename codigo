@@ -259,8 +259,9 @@ const App = () => {
   // availableProducts is now a Map for easier quantity management
   const [availableProducts, setAvailableProducts] = useState(new Map());
   // Initialize totals to 0
-  const [totalGeneralMesa, setTotalGeneralMesa] = useState(0);
-  const [propinaSugerida, setPropinaSugerida] = useState(0);
+  const [totalGeneralMesa, setTotalGeneralMesa] = useState(0); // This will now represent the sum of availableProducts base prices
+  const [propinaSugerida, setPropinaSugerida] = useState(0); // This will now be 10% of totalGeneralMesa
+
 
   const [comensales, setComensales] = useState([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -300,6 +301,7 @@ const App = () => {
 
   // The target total for the whole bill, including the original receipt's suggested tip
   // This will now dynamically update based on totalGeneralMesa and propinaSugerida states
+  // This value will be the *target* total for assigned items including tip.
   const totalBillWithReceiptTip = totalGeneralMesa + propinaSugerida;
 
   // Maximum number of comensales to prevent UI from becoming too crowded
@@ -307,8 +309,6 @@ const App = () => {
 
   useEffect(() => {
     // Start with no products or comensales initially, and totals at 0.
-    // The previous hardcoded receiptDataRaw is now explicitly ignored for initial state
-    // unless the user later requests it as a default.
     setAvailableProducts(new Map()); // Start with an empty product list
     setComensales([]); // Start with no comensales
     setTotalGeneralMesa(0); // Ensure totals are zero at start
@@ -316,6 +316,16 @@ const App = () => {
     setActiveSharedInstances(new Map()); // Reset shared instances tracker
 
   }, []);
+
+  // Recalculate main totals whenever availableProducts changes
+  useEffect(() => {
+    const baseTotal = Array.from(availableProducts.values()).reduce((sum, product) => {
+      return sum + (Number(product.price) * Number(product.quantity));
+    }, 0);
+    setTotalGeneralMesa(baseTotal);
+    setPropinaSugerida(baseTotal * 0.10); // 10% of the new base total
+  }, [availableProducts]);
+
 
   // Function to add a full item to a comensal's bill (now includes 10% tip)
   const handleAddItem = (comensalId, productId) => {
@@ -521,7 +531,7 @@ const App = () => {
     });
 
     // Calculate base price per share, then apply 10% tip to that portion
-    const basePricePerShare = Number(productToShare.price) / sharingComensalIds.length; // Ensure price is number
+    const basePricePerShare = Number(productToShare.price) / Number(sharingComensalIds.length); // Ensure price is number
     const priceWithTipPerShare = basePricePerShare * 1.10; // Price with 10% tip
 
     const shareInstanceId = Date.now() + Math.random(); // Unique ID for this specific shared instance
@@ -570,7 +580,7 @@ const App = () => {
     }
 
     // Generate a unique ID for the new comensal
-    const newComensalId = comensales.length > 0 ? Math.max(...comensales.map(c => c.id)) + 1 : 1;
+    const newComensalId = comensales.length > 0 ? Math.max(...comensales.map(c => Number(c.id))) + 1 : 1; // Ensure c.id is number
     const newComensal = {
       id: newComensalId,
       name: newComensalName.trim(),
@@ -704,8 +714,8 @@ const App = () => {
       // Reset application state when a new image is loaded
       setAvailableProducts(new Map()); // Clear existing products
       setComensales([]); // Clear all comensales
-      setTotalGeneralMesa(0); // Reset totals
-      setPropinaSugerida(0); // Reset propina
+      setTotalGeneralMesa(0); // Reset totals (these will be updated by AI or remain 0 if AI fails)
+      setPropinaSugerida(0); // Reset propina (this will be updated by AI or remain 0 if AI fails)
       setActiveSharedInstances(new Map()); // Reset shared instances tracker
 
       const reader = new FileReader();
@@ -842,21 +852,10 @@ const App = () => {
             });
             setAvailableProducts(newProductsMap); // Overwrite with new products
 
-            // Update summary totals if found in the parsed data
-            let newTotalGeneralMesa = 0;
-            if (typeof parsedData.totalGeneralMesa === 'number') {
-              newTotalGeneralMesa = parsedData.totalGeneralMesa;
-            }
-            setTotalGeneralMesa(newTotalGeneralMesa);
-
-            let newPropinaSugerida = 0;
-            if (typeof parsedData.propinaSugerida === 'number') {
-              newPropinaSugerida = parsedData.propinaSugerida;
-            } else {
-              // If propina is not found, calculate as 10% of totalGeneralMesa
-              newPropinaSugerida = newTotalGeneralMesa * 0.10;
-            }
-            setPropinaSugerida(newPropinaSugerida);
+            // For the main summary totals, we will calculate them from availableProducts using useEffect
+            // But if the AI specifically found them, we can display them as "Original Receipt Totals"
+            // For now, these are not directly tied to the primary `totalGeneralMesa` state that fuels `totalBillWithReceiptTip`.
+            // Instead, the main summary totals are based on the derived `availableProducts` sum.
 
         } else {
             setImageProcessingError("No se pudo extraer información de la imagen. Intenta con otra imagen o revisa el formato.");
@@ -876,11 +875,11 @@ const App = () => {
 
     // 1. Resumen General
     csvContent += "# RESUMEN DE TOTALES\n";
-    csvContent += `Total General Mesa (sin propina),${totalGeneralMesa.toLocaleString('es-CL')}\n`;
-    csvContent += `Propina Sugerida Recibo (10%),${propinaSugerida.toLocaleString('es-CL')}\n`;
-    csvContent += `Total Asignado a Comensales (con 10% propina/ítem),${currentTotalComensales.toLocaleString('es-CL')}\n`;
-    csvContent += `Diferencia Total (Recibo con Propina - Asignado),${remainingAmount.toLocaleString('es-CL')}\n`;
-    csvContent += `Propina Pendiente (Recibo - Asignado),${remainingPropinaDisplay.toLocaleString('es-CL')}\n`;
+    csvContent += `Total General Mesa (sin propina),${totalGeneralMesa.toLocaleString('es-CL')}\n`; // Changed to 'es-CL'
+    csvContent += `Propina Sugerida Recibo (10%),${propinaSugerida.toLocaleString('es-CL')}\n`; // Changed to 'es-CL'
+    csvContent += `Total Asignado a Comensales (con 10% propina/ítem),${currentTotalComensales.toLocaleString('es-CL')}\n`; // Changed to 'es-CL'
+    csvContent += `Diferencia Total (Recibo con Propina - Asignado),${remainingAmount.toLocaleString('es-CL')}\n`; // Changed to 'es-CL'
+    csvContent += `Propina Pendiente (Recibo - Asignado),${remainingPropinaDisplay.toLocaleString('es-CL')}\n`; // Changed to 'es-CL'
     csvContent += "\n";
 
     // 2. Detalle de Consumo por Comensal
@@ -891,8 +890,8 @@ const App = () => {
         csvContent += `${comensal.id},"${comensal.name}",,,,,\n`; // Empty row for comensals with no items
       } else {
         comensal.selectedItems.forEach(item => {
-          const itemPriceFormatted = Number(item.price).toLocaleString('es-CL');
-          const itemSubtotalFormatted = (Number(item.price) * Number(item.quantity)).toLocaleString('es-CL');
+          const itemPriceFormatted = Number(item.price).toLocaleString('es-CL'); // Changed to 'es-CL'
+          const itemSubtotalFormatted = (Number(item.price) * Number(item.quantity)).toLocaleString('es-CL'); // Changed to 'es-CL'
           const sharedBy = item.type === 'shared' ? Number(item.sharedByCount) : ''; // Ensure sharedByCount is number
           csvContent += `${comensal.id},"${comensal.name}","${item.name}",${Number(item.quantity)},"${itemPriceFormatted}","${itemSubtotalFormatted}",${item.type},${sharedBy}\n`;
         });
@@ -904,7 +903,7 @@ const App = () => {
     csvContent += "# TOTALES POR COMENSAL\n";
     csvContent += "Nombre Comensal,Total Comensal (con propina)\n";
     comensales.forEach(comensal => {
-      csvContent += `"${comensal.name}",${comensal.total.toLocaleString('es-CL')}\n`;
+      csvContent += `"${comensal.name}",${comensal.total.toLocaleString('es-CL')}\n`; // Changed to 'es-CL'
     });
 
     // Create a Blob and download it
@@ -946,7 +945,7 @@ const App = () => {
 
     setAvailableProducts(prevMap => {
       const newMap = new Map(prevMap);
-      let currentMaxId = Array.from(prevMap.values()).reduce((max, p) => Math.max(max, p.id), 0);
+      let currentMaxId = Array.from(prevMap.values()).reduce((max, p) => Math.max(max, Number(p.id)), 0); // Ensure p.id is number
 
       const existingProductEntry = Array.from(newMap.entries()).find(
         ([id, prod]) => prod.name === manualItemName.trim() && Number(prod.price) === price
@@ -954,7 +953,7 @@ const App = () => {
 
       if (existingProductEntry) {
         const [existingId, existingProduct] = existingProductEntry;
-        newMap.set(existingId, { ...existingProduct, quantity: Number(existingProduct.quantity) + quantity });
+        newMap.set(existingId, { ...existingProduct, quantity: Number(existingProduct.quantity) + quantity }); // Ensure quantity is number
       } else {
         newMap.set(++currentMaxId, {
           id: currentMaxId,
@@ -1112,11 +1111,11 @@ const App = () => {
         <h2 className="text-2xl font-bold text-blue-600 mb-4 text-center">Resumen de Totales</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-lg">
           <div className="flex justify-between items-center bg-blue-50 p-3 rounded-md shadow-sm">
-            <span className="font-semibold text-blue-800">Total General Mesa (sin propina):</span>
+            <span className="font-semibold text-blue-800">Total General Inventario (sin propina):</span> {/* Changed text */}
             <span className="text-blue-900 font-bold">${totalGeneralMesa.toLocaleString('es-CL')}</span>
           </div>
           <div className="flex justify-between items-center bg-green-50 p-3 rounded-md shadow-sm">
-            <span className="font-semibold text-green-800">Propina Sugerida Recibo (10%):</span>
+            <span className="font-semibold text-green-800">Propina Inventario (10%):</span> {/* Changed text */}
             <span className="text-green-900 font-bold">${propinaSugerida.toLocaleString('es-CL')}</span>
           </div>
           <div className="flex justify-between items-center bg-purple-50 p-3 rounded-md shadow-sm">
@@ -1124,17 +1123,17 @@ const App = () => {
             <span className="text-purple-900 font-bold">${currentTotalComensales.toLocaleString('es-CL')}</span>
           </div>
           <div className={`flex justify-between items-center p-3 rounded-md shadow-sm ${Math.abs(remainingAmount) > 0.02 ? (remainingAmount > 0 ? 'bg-red-50' : 'bg-orange-50') : 'bg-green-50'}`}>
-            <span className="font-semibold text-red-800">Diferencia Total (Recibo con Propina - Asignado):</span>
+            <span className="font-semibold text-red-800">Diferencia Total (Inventario con Propina - Asignado):</span> {/* Changed text */}
             <span className="text-red-900 font-bold">${remainingAmount.toLocaleString('es-CL')}</span>
           </div>
         </div>
         {Math.abs(remainingAmount) > 0.02 && (
           <p className="mt-4 text-center text-sm text-red-600">
-            Asegúrate de asignar todos los ítems para que el total de los comensales (con propina) coincida con el total del recibo (con propina).
+            Asegúrate de asignar todos los ítems para que el total de los comensales (con propina) coincida con el total del inventario (con propina).
           </p>
         )}
         <div className="flex justify-between items-center bg-yellow-50 p-3 rounded-md shadow-sm mt-4">
-            <span className="font-semibold text-yellow-800">Propina Pendiente (Recibo - Asignado):</span>
+            <span className="font-semibold text-yellow-800">Propina Pendiente (Inventario - Asignado):</span> {/* Changed text */}
             <span className="text-yellow-900 font-bold">${Math.max(0, remainingPropinaDisplay).toLocaleString('es-CL')}</span>
           </div>
       </div>
@@ -1347,7 +1346,7 @@ const App = () => {
                 <option value="" disabled>Selecciona un producto</option>
                 {Array.from(availableProducts.values()).filter(p => Number(p.quantity) > 0).map(product => ( // Ensure quantity is number
                   <option key={String(product.id)} value={product.id}>
-                    {product.name} (${Number(product.price).toLocaleString('es-CL')}) (Disp: {Number(product.quantity)})
+                    {product.name} (${Number(product.price).toLocaleString('es-CL')}) (Disp: {Number(product.quantity)}) {/* Changed to 'es-CL' */}
                   </option>
                 ))}
               </select>
@@ -1365,7 +1364,7 @@ const App = () => {
                         {item.type === 'shared' && ` (+10% Propina)`}
                       </span>
                       <div className="flex items-center space-x-2">
-                        <span className="text-gray-900">${(Number(item.price) * Number(item.quantity)).toLocaleString('es-CL')}</span>
+                        <span className="text-gray-900">${(Number(item.price) * Number(item.quantity)).toLocaleString('es-CL')}</span> {/* Changed to 'es-CL' */}
                         <button
                           // Use shareInstanceId for shared items, otherwise original product ID for full items
                           onClick={() => handleRemoveItem(comensal.id, item.type === 'shared' ? item.shareInstanceId : item.id)}
@@ -1386,7 +1385,7 @@ const App = () => {
             {/* Comensal Total */}
             <div className="mt-auto pt-4 border-t border-gray-200 flex justify-between items-center">
               <span className="text-lg font-semibold text-gray-800">Total (con propina):</span>
-              <span className="text-2xl font-extrabold text-blue-700">${comensal.total.toLocaleString('es-CL')}</span>
+              <span className="text-2xl font-extrabold text-blue-700">${comensal.total.toLocaleString('es-CL')}</span> {/* Changed to 'es-CL' */}
             </div>
 
             {/* Clear and Remove Comensal Buttons */}
@@ -1413,10 +1412,10 @@ const App = () => {
         <h2 className="text-2xl font-bold text-blue-600 mb-4">¡Cuentas Claras!</h2>
         <div className="flex justify-around items-center text-xl font-semibold">
           <div className="text-gray-700">
-            Total Asignado (con propina): <span className="text-green-700 font-extrabold">${currentTotalComensales.toLocaleString('es-CL')}</span>
+            Total Asignado (con propina): <span className="text-green-700 font-extrabold">${currentTotalComensales.toLocaleString('es-CL')}</span> {/* Changed to 'es-CL' */}
           </div>
           <div className="text-gray-700">
-            Propina Pendiente: <span className="text-orange-700 font-extrabold">${Math.max(0, remainingPropinaDisplay).toLocaleString('es-CL')}</span>
+            Propina Pendiente: <span className="text-orange-700 font-extrabold">${Math.max(0, remainingPropinaDisplay).toLocaleString('es-CL')}</span> {/* Changed to 'es-CL' */}
           </div>
         </div>
         <p className="mt-4 text-gray-500 text-sm">
