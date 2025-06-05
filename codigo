@@ -165,64 +165,66 @@ const ShareItemModal = ({ isOpen, onClose, availableProducts, comensales, onShar
 
 
 // Data from the receipt (parsed from the provided immersive artifact)
-// This data is now considered a fallback/initial state only,
-// and will be fully replaced if an image is loaded.
-const receiptDataRaw = `Cantidad,Producto,Total
-1,Heineken 500cc,4.990
-1,Heineken 500cc,4.990
-1,Heineken 500cc,4.990
-1,Heineken 500cc,4.990
-1,Schop Heineken,4.990
-1,Kunstmann Valdivia,5.590
-1,Schop Stella Artois,5.990
-1,Bebidas (lata de 330,2.590
-1,Coca Cola Zero,0
-1,Kunstmann Valdivia,5.590
-1,Pale Lager 500cc,6.590
-1,Piña colada sin alcohol,5.590
-1,Kunstmann Valdivia,5.590
-1,Pale Lager 500cc,5.590
-1,Austral Torres del Paine 500cc,5.590
-1,Mechada Italiana,1.590
-1,Mechada Italiana,11.990
-1,Mechada Italiana,11.990
-1,Mechada Italiana,11.990
-1,Mechada Italiana,11.990
-1,Schop Heineken H.H,5.990
-1,Michelada,3.590
-1,Carne Humo Saltado,13.990
-1,Rossetta,13.990
-1,Schop Heineken H.H,5.990
-1,Michelada,3.590
-1,Crudo TPH (250grs),11.990
-1,Kunstmann Valdivia,5.590
-1,Pale Lager 500cc,5.590
-1,Schop Heineken H.H,5.990
-1,Schop de Sangria H.H,3.390
-1,Margarita H.H,5.990
-1,Schop Heineken H.H,3.990
-1,2 Cortos Jack Daniel's Old No7 + 1 bebida,13.390
-1,+Ginger Ale,0
-1,Tiki Fresh,4.590
-1,2 Cortos Fernet Banca + 1 bebida,10.990
-,+Coca Cola Zero,0
-1,Bebidas (lata de 330,2.590
-1,Cc,0
-1,Vvital con gas,0
-1,Espresso Martini,6.990
-1,2 Cortos Pisco Mistral,8.990
-1,35+ + 1 bebida,0
-1,+Coca Cola Zero,0
-1,Espresso Martini,6.990
-,,,,
-Total General Mesa,,234.440
-Consumo Cliente,,234.440
-Propina Sugerida,,23.444
-Total c/propina,,257.884`;
+// Changed to an array of strings to avoid "Unterminated string constant" error
+const receiptDataLines = [
+  `Cantidad,Producto,Total`,
+  `1,Heineken 500cc,4.990`,
+  `1,Heineken 500cc,4.990`,
+  `1,Heineken 500cc,4.990`,
+  `1,Heineken 500cc,4.990`,
+  `1,Schop Heineken,4.990`,
+  `1,Kunstmann Valdivia,5.590`,
+  `1,Schop Stella Artois,5.990`,
+  `1,Bebidas (lata de 330,2.590`,
+  `1,Coca Cola Zero,0`,
+  `1,Kunstmann Valdivia,5.590`,
+  `1,Pale Lager 500cc,6.590`,
+  `1,Piña colada sin alcohol,5.590`,
+  `1,Kunstmann Valdivia,5.590`,
+  `1,Pale Lager 500cc,5.590`,
+  `1,Austral Torres del Paine 500cc,5.590`,
+  `1,Mechada Italiana,1.590`,
+  `1,Mechada Italiana,11.990`,
+  `1,Mechada Italiana,11.990`,
+  `1,Mechada Italiana,11.990`,
+  `1,Mechada Italiana,11.990`,
+  `1,Schop Heineken H.H,5.990`,
+  `1,Michelada,3.590`,
+  `1,Carne Humo Saltado,13.990`,
+  `1,Rossetta,13.990`,
+  `1,Schop Heineken H.H,5.990`,
+  `1,Michelada,3.590`,
+  `1,Crudo TPH (250grs),11.990`,
+  `1,Kunstmann Valdivia,5.590`,
+  `1,Pale Lager 500cc,5.590`,
+  `1,Schop Heineken H.H,5.990`,
+  `1,Schop de Sangria H.H,3.390`,
+  `1,Margarita H.H,5.990`,
+  `1,Schop Heineken H.H,3.990`,
+  `1,2 Cortos Jack Daniel's Old No7 + 1 bebida,13.390`,
+  `1,+Ginger Ale,0`,
+  `1,Tiki Fresh,4.590`,
+  `1,2 Cortos Fernet Banca + 1 bebida,10.990`,
+  `1,+Coca Cola Zero,0`,
+  `1,Bebidas (lata de 330,2.590`,
+  `1,Cc,0`,
+  `1,Vvital con gas,0`,
+  `1,Espresso Martini,6.990`,
+  `1,2 Cortos Pisco Mistral,8.990`,
+  `1,35+ + 1 bebida,0`,
+  `1,+Coca Cola Zero,0`,
+  `1,Espresso Martini,6.990`,
+  `,,,,`,
+  `Total General Mesa,,234.440`,
+  `Consumo Cliente,,234.440`,
+  `Propina Sugerida,,23.444`,
+  `Total c/propina,,257.884`,
+];
+
 
 // Function to parse the receipt data into a structured Map
 const parseReceiptData = (rawData) => {
-  const lines = rawData.split('\n');
+  const lines = rawData.split('\n'); // rawData is now a single string from .join('\n')
   const productLines = lines.slice(1, lines.indexOf(',,,,'));
 
   const productsMap = new Map(); // Map to store unique products by name_price key and their counts
@@ -233,7 +235,7 @@ const parseReceiptData = (rawData) => {
     if (parts.length === 3) {
       const name = parts[1].trim();
       // Price is the base price from the receipt
-      const price = parseFloat(parts[2].replace(/\./g, ''));
+      const price = parseFloat(parts[2].replace(/\./g, '').replace(',', '.')); // Ensure dot for decimal for parseFloat
 
       const key = `${name}_${price}`;
 
@@ -375,7 +377,7 @@ const App = () => {
               }];
             }
 
-            // Calculate new total for the comensal based on prices *with tip*
+            // Calculate new total for the comensal based on prices *con propina*
             const newTotal = updatedItems.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0); // Ensure numbers
             return { ...comensal, selectedItems: updatedItems, total: newTotal, selectedProductId: "" }; // Reset dropdown
           }
@@ -443,7 +445,7 @@ const App = () => {
             }
           }
 
-          // Calculate new total for the comensal based on prices *with tip*
+          // Calculate new total for the comensal based on prices *con propina*
           const newTotal = updatedItems.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0); // Ensure numbers
           return { ...comensal, selectedItems: updatedItems, total: newTotal };
         }
@@ -559,7 +561,7 @@ const App = () => {
               shareInstanceId: shareInstanceId // Unique ID for tracking this specific shared item instance
             }
           ];
-          // Calculate new total for the comensal based on prices *with tip*
+          // Calculate new total for the comensal based on prices *con propina*
           const newTotal = updatedItems.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0); // Ensure numbers
           return { ...comensal, selectedItems: updatedItems, total: newTotal, selectedProductId: "" }; // Reset dropdown
         }
